@@ -2,12 +2,11 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
+
+	"github.com/Pepegakac123/pokedexcli/internal/pokeapi"
 )
 
 type cliCommand struct {
@@ -104,80 +103,46 @@ func commandHelp(cfg *Config) error {
 	return nil
 }
 func commandMap(cfg *Config) error {
-	var locationResponse LocationResponse
-	targetUrl := "https://pokeapi.co/api/v2/location-area/"
+	url := "https://pokeapi.co/api/v2/location-area/"
 	if cfg.nextUrl != "" {
-		targetUrl = cfg.nextUrl
+		url = cfg.nextUrl
 	}
-	res, err := http.Get(targetUrl)
-	if err != nil {
-		fmt.Println("Something wen wrong with request")
-		return err
-	}
-	defer res.Body.Close()
 
-	data, err := io.ReadAll(res.Body)
-	if res.StatusCode > 299 {
-		return fmt.Errorf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, data)
-	}
+	response, err := pokeapi.GetLocationAreas(url)
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(data, &locationResponse)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	updateConfigUrls(cfg, locationResponse)
-	if len(locationResponse.Results) <= 0 {
-		return fmt.Errorf("There is no locations in the response")
-	}
-	for _, location := range locationResponse.Results {
+
+	updateConfigUrls(cfg, *response)
+
+	for _, location := range response.Results {
 		fmt.Printf("%v\n", location.Name)
 	}
 
 	return nil
-
 }
+
 func commandMapb(cfg *Config) error {
-	var locationResponse LocationResponse
-	targetUrl := ""
-	if cfg.prevUrl != "" {
-		targetUrl = cfg.prevUrl
-	} else {
+	if cfg.prevUrl == "" {
 		fmt.Println("you're on the first page")
 		return nil
 	}
 
-	res, err := http.Get(targetUrl)
+	response, err := pokeapi.GetLocationAreas(cfg.prevUrl)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
 
-	data, err := io.ReadAll(res.Body)
-	if res.StatusCode > 299 {
-		return fmt.Errorf("Response failed with status code: %d and\nbody: %s\n", res.StatusCode, data)
-	}
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(data, &locationResponse)
-	if err != nil {
-		return err
-	}
-	updateConfigUrls(cfg, locationResponse)
-	if len(locationResponse.Results) <= 0 {
-		return fmt.Errorf("There is no locations in the response")
-	}
-	for _, location := range locationResponse.Results {
+	updateConfigUrls(cfg, *response)
+
+	for _, location := range response.Results {
 		fmt.Printf("%v\n", location.Name)
 	}
 
 	return nil
 }
 
-func updateConfigUrls(cfg *Config, response LocationResponse) {
+func updateConfigUrls(cfg *Config, response pokeapi.LocationResponse) {
 	if response.Next != nil {
 		cfg.nextUrl = *response.Next
 	} else {
